@@ -1,0 +1,89 @@
+# Written by Aghogho Dre Aruoture
+
+AWSTemplateFormatVersion: 2010-09-09
+Description: >-
+  This Sample template will setup an Apache on a Linux Ec2 instance
+  and will reference the SampleNetworkCrossStack previoulsy created.
+  Note that you are billed for the AWS resources that you use when
+  you create a stack from this template.
+
+Parameters:
+  InstanceType:
+    Description: Linux EC2 InstanceType with an Apache
+    Type: String
+    Default: t2.micro
+    AllowedValues:
+      - t1.micro
+      - t2.micro
+      - t2.small
+      - t2.large
+      - t2.medium
+      - t2.nano
+      - t3.micro
+  KeyName:
+    Description: Name of an existing EC2 key pair for SSH access to the EC2 instance.
+    Type: AWS::EC2::KeyPair::KeyName
+    ConstraintDescription: Must be the name of an exixting keypair
+  ImageId:
+    Type: AWS::SSM::Parameter::Value<AWS::EC2::Image::Id>
+    Default: /aws/service/ami-amazon-linux-latest/amzn2-ami-hvm-x86_64-gp2
+
+Resources:
+  ApacheEC2Instance:
+    Type: AWS::EC2::Instance
+    Properties:
+      AvailabilityZone: !Select [ 0, !GetAZs '']
+      InstanceType: !Ref InstanceType
+      ImageId: !FindInMap [RegionsMap, !Ref AWS::Region, "HVM64"]
+      KeyName: !Ref KeyName
+      SubnetId:
+          Fn::ImportValue: 'SampleNetworkCrossStack-SubnetID'
+      SecurityGroupIds:
+        - Fn::ImportValue:
+            SampleNetworkCrossStack-SecurityGroupID
+      Tags:
+        - Key: "Name"
+          Value: "ApacheEC2InstanceByDre"
+      UserData:
+        Fn::Base64: !Sub |
+          #!/bin/bash
+          yum update -y
+          yum install -y httpd
+          systemctl start httpd
+          systemctl enable httpd
+          echo "<html><body><h1>WELCOME TO CLOUDFORMATION</h1><br>You successfully access Aghogho Dre Aruotureweb page launched via a CloudFormation template in ${AWS::Region} region</h1></body></html>" > /var/www/html/index.html
+  ElasticIP:
+    Type: AWS::EC2::EIP
+    Properties:
+      InstanceId: !Ref ApacheEC2Instance
+
+Mappings:
+ RegionsMap: # Name of the mapping 
+   us-west-1: # Top level key
+    "HVM64": "ami-073e64e4c237c08ad" # N.Califonia second level key 
+   us-west-2:
+    "HVM64": "ami-0ccea833bf267252a" # Oregon
+   us-east-1:
+    "HVM64": "ami-04cb4ca688797756f" # N.Virginia
+   us-east-2:
+    "HVM64": "ami-01103fb68b3569475" # Ohio
+   ca-central-1:
+    "HVM64": "ami-042f39687f93b4afb" # Canada
+   eu-north-1:
+    "HVM64": "ami-0b0d560d43e65a601" # Sweden(Stockholm)
+Outputs:
+  InstanceId:
+    Description: InstanceId of the newly created EC2 ApacheEC2Instance
+    Value: !GetAtt ApacheEC2Instance.PublicIp # return the IP address
+  PublicDnsName:
+    Description: Display the public DNS Name of the EC2 ApacheEC2Instance
+    Value: !GetAtt ApacheEC2Instance.PublicDnsName
+  PrivateDnsName:
+    Description: Display the private DNS Name of the EC2 ApacheEC2Instance
+    Value: !GetAtt ApacheEC2Instance.PrivateDnsName
+  PrivateIp:
+    Description: Private IP V4 addresses
+    Value: !GetAtt ApacheEC2Instance.PrivateIp
+
+    
+  
